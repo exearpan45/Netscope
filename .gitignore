@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local NETSCOPE monitoring data (never commit)
+data/*.db
+data/*.db-*
+data/backups/
+data/live_state.json
