@@ -7,6 +7,8 @@ Wants=network-online.target
 Type=simple
 ExecStart=/usr/bin/python3 -m netscope.daemon --daemon
 WorkingDirectory=/usr/lib/netscope
+Environment=PYTHONPATH=/usr/lib/netscope
+Environment=PYTHONUNBUFFERED=1
 Environment=NETSCOPE_DB_PATH=%h/.local/share/netscope/netscope.db
 Environment=NETSCOPE_LIVE_STATE=%h/.local/share/netscope/live_state.json
 Restart=on-failure

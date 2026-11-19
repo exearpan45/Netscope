@@ -14,31 +14,30 @@ from netscope.db import NetscopeDB  # noqa: E402
 from netscope.exporter import export_csv, export_json, export_pdf  # noqa: E402
 
 try:
-    from PySide6.QtCore import Qt, QTimer
-    from PySide6.QtGui import QAction, QIcon
-    from PySide6.QtWidgets import (
-        QApplication,
-        QFileDialog,
-        QFrame,
-        QHBoxLayout,
-        QHeaderView,
-        QLabel,
-        QListWidget,
-        QMainWindow,
-        QMessageBox,
-        QPushButton,
-        QStackedWidget,
-        QSystemTrayIcon,
-        QTableWidget,
-        QTableWidgetItem,
-        QVBoxLayout,
-        QWidget,
-        QMenu,
-    )
+    try:
+        from PySide6.QtCore import Qt, QTimer
+        from PySide6.QtGui import QAction, QIcon
+        from PySide6.QtWidgets import (
+            QApplication, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
+            QLabel, QListWidget, QMainWindow, QMessageBox, QPushButton,
+            QStackedWidget, QSystemTrayIcon, QTableWidget, QTableWidgetItem,
+            QVBoxLayout, QWidget, QMenu,
+        )
+    except ImportError:
+        # Ubuntu 24.04 / Zorin 18 provide PyQt6 rather than PySide6.
+        from PyQt6.QtCore import Qt, QTimer
+        from PyQt6.QtGui import QAction, QIcon
+        from PyQt6.QtWidgets import (
+            QApplication, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
+            QLabel, QListWidget, QMainWindow, QMessageBox, QPushButton,
+            QStackedWidget, QSystemTrayIcon, QTableWidget, QTableWidgetItem,
+            QVBoxLayout, QWidget, QMenu,
+        )
 except ImportError as exc:
     sys.stderr.write(
-        "PySide6 is required for the native Qt desktop GUI. Install python3-pyside6 or pip install PySide6.\n"
-        f"Import error: {exc}\n"
+        "A Qt 6 Python binding is required. Install python3-pyqt6 (recommended) "
+        "or python3-pyside6.\\n"
+        f"Import error: {exc}\\n"
     )
     raise SystemExit(1)
 
@@ -208,7 +207,7 @@ class NetscopeWindow(QMainWindow):
     def _make_table(self, headers: list[str]) -> QTableWidget:
         tbl = QTableWidget(0, len(headers))
         tbl.setHorizontalHeaderLabels(headers)
-        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         tbl.setStyleSheet("QTableWidget { background: #111827; gridline-color: #1e293b; border: 1px solid #1e293b; }")
         return tbl
 
@@ -291,10 +290,15 @@ class NetscopeWindow(QMainWindow):
 
 
 def main() -> int:
-    app = QApplication(sys.argv)
+    smoke_test = "--smoke-test" in sys.argv[1:]
+    app = QApplication([sys.argv[0]])
     db = NetscopeDB()
     win = NetscopeWindow(db)
     win.show()
+    if smoke_test:
+        app.processEvents()
+        win.close()
+        return 0
     return app.exec()
 
 

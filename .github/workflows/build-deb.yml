@@ -1,0 +1,51 @@
+name: Build and smoke-test NETSCOPE Debian package
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - "fix/**"
+    paths:
+      - "netscope/**"
+      - "linux-desktop/**"
+      - ".github/workflows/build-deb.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install runtime and packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev python3-pyqt6 iproute2 qt6-qpa-plugins
+
+      - name: Build Debian package
+        run: bash linux-desktop/build-deb.sh
+
+      - name: Validate package metadata and contents
+        run: |
+          dpkg-deb --info dist-deb/netscope_1.0.1_amd64.deb
+          dpkg-deb --contents dist-deb/netscope_1.0.1_amd64.deb
+          dpkg-deb --field dist-deb/netscope_1.0.1_amd64.deb Depends | grep -q python3-pyqt6
+
+      - name: Install package and smoke-test GUI startup
+        run: |
+          sudo apt-get install -y ./dist-deb/netscope_1.0.1_amd64.deb
+          QT_QPA_PLATFORM=offscreen netscope --smoke-test
+
+      - name: Upload tested Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: netscope-1.0.1-amd64-deb
+          path: dist-deb/netscope_1.0.1_amd64.deb
+          if-no-files-found: error
