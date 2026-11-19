@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Builds a genuine Debian (.deb) package for Ubuntu / Zorin OS / Linux Mint / Debian
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="1.0.0"
+VERSION="1.0.1"
 PKG_NAME="netscope_${VERSION}_amd64"
 BUILD_DIR="${ROOT_DIR}/dist-deb/${PKG_NAME}"
 
@@ -26,6 +26,10 @@ cat > "${BUILD_DIR}/usr/bin/netscope" <<'EOF'
 export NETSCOPE_DB_PATH="${HOME}/.local/share/netscope/netscope.db"
 export NETSCOPE_LIVE_STATE="${HOME}/.local/share/netscope/live_state.json"
 mkdir -p "${HOME}/.local/share/netscope"
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  systemctl --user start netscope.service >/dev/null 2>&1 || true
+fi
 exec /usr/bin/python3 /usr/lib/netscope/netscope_gui.py "$@"
 EOF
 chmod 755 "${BUILD_DIR}/usr/bin/netscope"
@@ -41,12 +45,12 @@ Version: ${VERSION}
 Section: net
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pyside6.qtcore | python3-pyside6, iproute2
+Depends: python3 (>= 3.10), python3-pyqt6, iproute2
 Recommends: libnotify-bin, nftables
 Maintainer: NETSCOPE Engineering <support@netscope.local>
-Description: Complete Network Intelligence for Linux
- Real-time Linux network data usage monitor, per-application tracker,
- browser telemetry bridge, and historical SQLite bandwidth analytics.
+Description: NETSCOPE Linux Network Monitor
+ Real-time interface usage monitor with process and optional browser telemetry.
+ Per-process byte accounting depends on kernel and permission capabilities.
 EOF
 
 cat > "${BUILD_DIR}/DEBIAN/postinst" <<'EOF'
