@@ -1,0 +1,6 @@
+{
+  "name": "NETSCOPE — Linux Network Intelligence",
+  "description": "Real-time Linux network data usage monitor, per-application tracker, browser telemetry analyzer, and historical bandwidth intelligence center backed by kernel counters and SQLite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

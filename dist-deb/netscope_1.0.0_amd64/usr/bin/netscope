@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+export NETSCOPE_DB_PATH="${HOME}/.local/share/netscope/netscope.db"
+export NETSCOPE_LIVE_STATE="${HOME}/.local/share/netscope/live_state.json"
+mkdir -p "${HOME}/.local/share/netscope"
+exec /usr/bin/python3 /usr/lib/netscope/netscope_gui.py "$@"

@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "NETSCOPE Tab Telemetry Bridge",
+  "version": "1.0.0",
+  "description": "Reports honest HTTP header/payload telemetry per browser tab to the local NETSCOPE Linux monitor. Never collects cookies, credentials, or page contents.",
+  "permissions": [
+    "tabs",
+    "webRequest",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "NETSCOPE Tab Telemetry"
+  }
+}

@@ -1,0 +1,11 @@
+Package: netscope
+Version: 1.0.0
+Section: net
+Priority: optional
+Architecture: amd64
+Depends: python3 (>= 3.10), python3-pyside6.qtcore | python3-pyside6, iproute2
+Recommends: libnotify-bin, nftables
+Maintainer: NETSCOPE Engineering <support@netscope.local>
+Description: Complete Network Intelligence for Linux
+ Real-time Linux network data usage monitor, per-application tracker,
+ browser telemetry bridge, and historical SQLite bandwidth analytics.

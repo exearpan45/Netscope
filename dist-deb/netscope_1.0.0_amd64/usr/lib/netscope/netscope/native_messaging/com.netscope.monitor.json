@@ -1,0 +1,9 @@
+{
+  "name": "com.netscope.monitor",
+  "description": "NETSCOPE Local Browser Telemetry Native Messaging Host",
+  "path": "/usr/lib/netscope/netscope_nmh.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://netscopelinuxmonitorplaceholderid/"
+  ]
+}

@@ -1,0 +1,19 @@
+[Unit]
+Description=NETSCOPE Background Network Monitoring Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m netscope.daemon --daemon
+WorkingDirectory=/usr/lib/netscope
+Environment=NETSCOPE_DB_PATH=%h/.local/share/netscope/netscope.db
+Environment=NETSCOPE_LIVE_STATE=%h/.local/share/netscope/live_state.json
+Restart=on-failure
+RestartSec=3
+Nice=10
+MemoryMax=120M
+CPUQuota=15%
+
+[Install]
+WantedBy=default.target

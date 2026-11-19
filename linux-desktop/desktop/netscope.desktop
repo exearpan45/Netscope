@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=NETSCOPE
+Comment=Complete Network Intelligence for Linux
+Exec=/usr/bin/netscope
+Icon=netscope
+Terminal=false
+Type=Application
+Categories=System;Monitor;Network;
+Keywords=network;bandwidth;monitor;traffic;data;usage;
+StartupNotify=true
