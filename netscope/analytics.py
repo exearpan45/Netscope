@@ -56,6 +56,35 @@ def resolve_date_range(
     return "1970-01-01", today.isoformat(), "Lifetime (Since Monitoring Started)"
 
 
+def resolve_custom_limit_range(
+    limit: dict[str, Any], today: dt.date | None = None
+) -> tuple[str, str, str]:
+    """Resolve a custom allowance into fixed, repeatable N-day cycles.
+
+    Cycles are anchored to the limit's creation date. This prevents the same
+    rolling-window threshold from generating a fresh warning every day.
+    """
+    current = today or now_local().date()
+    days = max(1, int(limit.get("custom_days", 30) or 30))
+    created_at = str(limit.get("created_at") or "")
+    try:
+        created = dt.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        if created.tzinfo is not None:
+            anchor = created.astimezone(now_local().tzinfo).date()
+        else:
+            anchor = created.date()
+    except (TypeError, ValueError):
+        anchor = current - dt.timedelta(days=days - 1)
+
+    if anchor > current:
+        anchor = current
+    cycle = max(0, (current - anchor).days // days)
+    start = anchor + dt.timedelta(days=cycle * days)
+    end = min(start + dt.timedelta(days=days - 1), current)
+    period_key = f"custom-{int(limit.get('id', 0))}-{start.isoformat()}"
+    return start.isoformat(), end.isoformat(), period_key
+
+
 def query_period_analytics(
     db: NetscopeDB,
     period: str = "last_30_days",
@@ -71,8 +100,15 @@ def query_period_analytics(
     if exclude_loopback:
         where_clauses.append("is_loopback = 0")
     if iface_filter and iface_filter != "all":
+        # An explicit interface filter is an intentional request to inspect
+        # that interface, including VPN/virtual interfaces.
         where_clauses.append("iface = ?")
         params.append(iface_filter)
+    else:
+        # Tunnel + underlay and bridge + physical counters can count the same
+        # packets twice. Keep these interfaces visible individually, but
+        # exclude them from aggregate usage totals.
+        where_clauses.extend(["is_vpn = 0", "iface_type != 'virtual'"])
 
     where_sql = " AND ".join(where_clauses)
 
@@ -152,6 +188,8 @@ def query_period_analytics(
             if iface_filter and iface_filter != "all":
                 p_where.append("iface = ?")
                 p_params.append(iface_filter)
+            else:
+                p_where.extend(["is_vpn = 0", "iface_type != 'virtual'"])
             prev_row = conn.execute(
                 f"SELECT SUM(rx_bytes + tx_bytes) AS tot FROM daily_interface_usage WHERE {' AND '.join(p_where)}",
                 p_params,
@@ -224,6 +262,8 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
         ts_buckets: dict[str, dict[str, Any]] = {}
         for s in reversed(samples):
             if exclude_loopback and s["is_loopback"]:
+                continue
+            if s["is_vpn"] or s["iface_type"] == "virtual":
                 continue
             ts = s["ts_utc"]
             if ts not in ts_buckets:
@@ -337,7 +377,13 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
         alerts = [
             dict(r)
             for r in conn.execute(
-                "SELECT * FROM alert_events ORDER BY id DESC LIMIT 40"
+                """
+                SELECT a.*, COALESCE(l.notify_desktop, 1) AS notify_desktop
+                FROM alert_events AS a
+                LEFT JOIN data_limits AS l ON l.id = a.limit_id
+                ORDER BY a.id DESC
+                LIMIT 40
+                """
             ).fetchall()
         ]
 
@@ -366,8 +412,8 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
         elif p == "monthly":
             consumed = month_summary["summary"]["total_bytes"]
         else:
-            start_c = (now_local().date() - dt.timedelta(days=max(1, lim["custom_days"]) - 1)).isoformat()
-            custom_res = query_period_analytics(db, "custom", start_c, today_str, exclude_loopback=exclude_loopback)
+            start_c, end_c, _ = resolve_custom_limit_range(lim, now_local().date())
+            custom_res = query_period_analytics(db, "custom", start_c, end_c, exclude_loopback=exclude_loopback)
             consumed = custom_res["summary"]["total_bytes"]
         pct = round((consumed / lim["limit_bytes"]) * 100.0, 2) if lim["limit_bytes"] > 0 else 0.0
         limits_enriched.append(
@@ -378,19 +424,19 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
             }
         )
 
-    cur_rx_bps = sum(
-        i["rx_rate_bps"]
-        for i in interfaces_out
+    # Apply the same non-duplicating policy to global live rates.
+    # Individual VPN/virtual interface rates remain visible in interfaces_out.
+    aggregate_interfaces = [
+        i for i in interfaces_out
         if not (exclude_loopback and i["iface_type"] == "loopback")
-    )
-    cur_tx_bps = sum(
-        i["tx_rate_bps"]
-        for i in interfaces_out
-        if not (exclude_loopback and i["iface_type"] == "loopback")
-    )
+        and i["iface_type"] not in ("vpn", "virtual")
+    ]
+    cur_rx_bps = sum(i["rx_rate_bps"] for i in aggregate_interfaces)
+    cur_tx_bps = sum(i["tx_rate_bps"] for i in aggregate_interfaces)
 
     active_non_lo = [
-        i for i in interfaces_out if i["iface_type"] != "loopback" and i["status"] == "up"
+        i for i in interfaces_out
+        if i["iface_type"] not in ("loopback", "virtual") and i["status"] == "up"
     ]
     vpn_connected = any(i["iface_type"] == "vpn" and i["status"] == "up" for i in interfaces_out)
 

@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from netscope.analytics import query_period_analytics
+from netscope.analytics import query_period_analytics, resolve_custom_limit_range
 from netscope.capabilities import detect_capabilities
 from netscope.db import NetscopeDB, local_date_str, now_local, now_utc_iso
 from netscope.history_importer import run_historical_import
@@ -33,18 +33,48 @@ def _handle_signal(_signum: int, _frame: Any) -> None:
     _RUNNING = False
 
 
-def _send_desktop_notification(title: str, body: str) -> None:
+def _desktop_gui_running() -> bool:
+    """Avoid duplicate popups when the Qt tray application owns notifications."""
+    try:
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit() or entry == str(os.getpid()):
+                continue
+            try:
+                with open(f"/proc/{entry}/cmdline", "rb") as fh:
+                    cmdline = fh.read()
+                if b"netscope_gui.py" in cmdline:
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
+def _send_desktop_notification(title: str, body: str) -> bool:
+    """Send a session notification and report failures instead of hiding them."""
     notify_bin = shutil.which("notify-send")
     if not notify_bin:
-        return
+        sys.stderr.write("[netscope.daemon] notify-send is unavailable; desktop alert was not delivered.\n")
+        return False
     try:
-        subprocess.Popen(
+        result = subprocess.run(
             [notify_bin, "-a", "NETSCOPE", title, body],
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=5,
+            check=False,
         )
-    except OSError:
-        pass
+        if result.returncode != 0:
+            detail = (result.stderr or "").strip() or f"exit status {result.returncode}"
+            sys.stderr.write(f"[netscope.daemon] desktop notification failed: {detail}\n")
+            return False
+        return True
+    except (OSError, subprocess.SubprocessError) as exc:
+        sys.stderr.write(f"[netscope.daemon] desktop notification error: {exc}\n")
+        return False
 
 
 def _write_live_state(payload: dict[str, Any]) -> None:
@@ -65,16 +95,11 @@ class MonitorEngine:
         self.last_tick_mono: float = time.monotonic()
         self.last_backup_date: str = ""
 
-        # Seed previous interface counters from DB if present, or current /proc/net/dev
-        with self.db.connect() as conn:
-            for row in conn.execute(
-                "SELECT iface, last_rx_bytes, last_tx_bytes, status FROM interface_state"
-            ).fetchall():
-                self.prev_iface_bytes[row["iface"]] = (
-                    int(row["last_rx_bytes"]),
-                    int(row["last_tx_bytes"]),
-                )
-                self.prev_iface_status[row["iface"]] = row["status"]
+        # Always establish a fresh in-memory baseline. Reusing persisted kernel
+        # counters after a reboot or daemon restart can turn the entire gap since
+        # the last sample into a false one-second traffic spike.
+        self.prev_iface_bytes = {}
+        self.prev_iface_status = {}
 
     def _evaluate_limits(self, local_date: str, settings: dict[str, str]) -> None:
         exclude_lo = settings.get("exclude_loopback", "true") == "true"
@@ -100,9 +125,8 @@ class MonitorEngine:
                 res = query_period_analytics(self.db, "this_month", exclude_loopback=exclude_lo)
                 period_key = now_d.strftime("%Y-%m")
             else:
-                start_c = (now_d - dt.timedelta(days=max(1, lim["custom_days"]) - 1)).isoformat()
-                res = query_period_analytics(self.db, "custom", start_c, local_date, exclude_loopback=exclude_lo)
-                period_key = f"custom-{lim['id']}-{local_date}"
+                start_c, end_c, period_key = resolve_custom_limit_range(lim, now_d)
+                res = query_period_analytics(self.db, "custom", start_c, end_c, exclude_loopback=exclude_lo)
 
             consumed = int(res["summary"]["total_bytes"])
             limit_bytes = int(lim["limit_bytes"])
@@ -133,7 +157,8 @@ class MonitorEngine:
                         )
                         conn.commit()
                         if cur.rowcount > 0 and desktop_ok and lim["notify_desktop"]:
-                            _send_desktop_notification("NETSCOPE Data Allowance Alert", msg)
+                            if not _desktop_gui_running():
+                                _send_desktop_notification("NETSCOPE Data Allowance Alert", msg)
 
     def step(self) -> dict[str, Any]:
         settings = self.db.get_settings()

@@ -354,7 +354,10 @@ def _read_ss_tcp_info_bytes() -> dict[tuple[str, int, str, int], tuple[int, int]
             if not line.startswith((" ", "\t")):
                 cols = stripped.split()
                 if len(cols) >= 4:
-                    local_ep, remote_ep = cols[2], cols[3]
+                    # ss output columns are: STATE RECV-Q SEND-Q LOCAL PEER.
+                    # cols[2]/cols[3] parsed queue depth as an endpoint, silently
+                    # disabling per-process byte attribution.
+                    local_ep, remote_ep = cols[-2], cols[-1]
                     if ":" in local_ep and ":" in remote_ep:
                         lip, lport = local_ep.rsplit(":", 1)
                         rip, rport = remote_ep.rsplit(":", 1)
@@ -369,7 +372,7 @@ def _read_ss_tcp_info_bytes() -> dict[tuple[str, int, str, int], tuple[int, int]
                     rx_b = int(rx_m.group(1)) if rx_m else 0
                     tx_b = int(tx_m.group(1)) if tx_m else 0
                     out[current_key] = (rx_b, tx_b)
-                current_key = None
+                    current_key = None
         return out
     except (OSError, subprocess.SubprocessError):
         return {}
@@ -450,8 +453,9 @@ def collect_process_applications(
                 "tx_delta": 0,
                 "rx_rate_bps": 0.0,
                 "tx_rate_bps": 0.0,
-                "bytes_available": bytes_actually_measured,
-                "measurement_source": measurement_method if bytes_actually_measured else "proc_socket_attribution_only",
+                "bytes_available": False,
+                "measurement_source": "proc_socket_attribution_only",
+                "_measured_socket_count": 0,
                 "connections": [],
                 "interfaces": set(),
                 "_seen_inodes": set(),
@@ -498,6 +502,7 @@ def collect_process_applications(
                     d_tx = max(0, cur_tx - prev_tx)
                     bucket["rx_delta"] += d_rx
                     bucket["tx_delta"] += d_tx
+                    bucket["_measured_socket_count"] += 1
 
             bucket["connections"].append(
                 {
@@ -516,6 +521,10 @@ def collect_process_applications(
     for bucket in apps.values():
         bucket.pop("_seen_inodes", None)
         bucket["interfaces"] = sorted(bucket["interfaces"])
+        bucket["bytes_available"] = bucket.pop("_measured_socket_count", 0) > 0
+        bucket["measurement_source"] = (
+            measurement_method if bucket["bytes_available"] else "proc_socket_attribution_only"
+        )
         if bucket["bytes_available"]:
             bucket["rx_rate_bps"] = round(bucket["rx_delta"] / safe_dt, 2)
             bucket["tx_rate_bps"] = round(bucket["tx_delta"] / safe_dt, 2)
