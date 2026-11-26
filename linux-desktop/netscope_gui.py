@@ -14,9 +14,9 @@ from netscope.db import NetscopeDB  # noqa: E402
 from netscope.exporter import export_csv, export_json, export_pdf  # noqa: E402
 
 try:
-    from PySide6.QtCore import Qt, QTimer
-    from PySide6.QtGui import QAction, QIcon
-    from PySide6.QtWidgets import (
+    from PyQt6.QtCore import Qt, QTimer
+    from PyQt6.QtGui import QAction, QIcon
+    from PyQt6.QtWidgets import (
         QApplication,
         QFileDialog,
         QFrame,
@@ -37,8 +37,8 @@ try:
     )
 except ImportError as exc:
     sys.stderr.write(
-        "PySide6 is required for the native Qt desktop GUI. Install python3-pyside6 or pip install PySide6.\n"
-        f"Import error: {exc}\n"
+        "PyQt6 is required for the native Qt desktop GUI. Install python3-pyqt6.\\n"
+        f"Import error: {exc}\\n"
     )
     raise SystemExit(1)
 
