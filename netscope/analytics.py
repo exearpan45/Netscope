@@ -435,7 +435,8 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
     cur_tx_bps = sum(i["tx_rate_bps"] for i in aggregate_interfaces)
 
     active_non_lo = [
-        i for i in interfaces_out if i["iface_type"] != "loopback" and i["status"] == "up"
+        i for i in interfaces_out
+        if i["iface_type"] not in ("loopback", "virtual") and i["status"] == "up"
     ]
     vpn_connected = any(i["iface_type"] == "vpn" and i["status"] == "up" for i in interfaces_out)
 
