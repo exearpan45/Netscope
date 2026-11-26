@@ -54,9 +54,9 @@ class NetscopeTestSuite(unittest.TestCase):
 
     def test_ss_tcp_info_parser_uses_local_and_peer_columns(self) -> None:
         sample = (
-            "State Recv-Q Send-Q Local Address:Port Peer Address:Port\\n"
-            "ESTAB 0 0 192.168.1.20:43122 93.184.216.34:443\\n"
-            " cubic wscale:7,7 bytes_acked:9876 bytes_received:5432\\n"
+            "State Recv-Q Send-Q Local Address:Port Peer Address:Port\n"
+            "ESTAB 0 0 192.168.1.20:43122 93.184.216.34:443\n"
+            " cubic wscale:7,7 bytes_acked:9876 bytes_received:5432\n"
         )
         completed = SimpleNamespace(returncode=0, stderr="", stdout=sample)
         with patch("netscope.proc_monitor.shutil.which", return_value="/usr/bin/ss"):
