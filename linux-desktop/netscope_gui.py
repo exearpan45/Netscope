@@ -170,6 +170,9 @@ class NetscopeWindow(QMainWindow):
                 pl.addWidget(self.tabs_table)
             elif idx == 4:
                 pl.addWidget(self._make_table(["Interface", "Type", "Status", "Since Boot DL", "Since Boot UL"]))
+            elif idx == 9:
+                self.alerts_table = self._make_table(["Time", "Limit ID", "Threshold", "Consumed", "Alert"])
+                pl.addWidget(self.alerts_table)
             else:
                 info = QLabel(f"Live SQLite-backed view for {SIDEBAR_PAGES[idx]}. Use the Web Dashboard on http://localhost:3000 for rich interactive SVG graphs.")
                 info.setWordWrap(True)
@@ -199,6 +202,9 @@ class NetscopeWindow(QMainWindow):
         tray_menu.addAction(quit_act)
         self.tray.setContextMenu(tray_menu)
         self.tray.show()
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM alert_events").fetchone()
+        self.last_alert_id = int(row[0] or 0)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh_data)
@@ -237,6 +243,23 @@ class NetscopeWindow(QMainWindow):
 
     def refresh_data(self) -> None:
         state = query_dashboard_state(self.db)
+        # Alert rows are persisted by the daemon. The Qt tray is the notification
+        # owner while this GUI is running, preventing duplicate notify-send popups.
+        new_alerts = sorted(
+            (a for a in state["alerts"] if int(a["id"]) > self.last_alert_id),
+            key=lambda a: int(a["id"]),
+        )
+        for alert in new_alerts:
+            if (
+                state["settings"].get("desktop_notifications", "true") == "true"
+                and bool(alert.get("notify_desktop", 1))
+            ):
+                self.tray.showMessage(
+                    "NETSCOPE Data Allowance Alert",
+                    str(alert["message"]),
+                )
+            self.last_alert_id = max(self.last_alert_id, int(alert["id"]))
+
         st = state["status"]
         paused = st["monitoring_paused"]
         self.pause_btn.setText("Resume Monitoring" if paused else "Pause Monitoring")
@@ -274,6 +297,19 @@ class NetscopeWindow(QMainWindow):
             ]
             for c, v in enumerate(vals):
                 self.ifaces_table.setItem(r, c, QTableWidgetItem(str(v)))
+
+        alerts = state["alerts"]
+        self.alerts_table.setRowCount(len(alerts))
+        for r, alert in enumerate(alerts):
+            vals = [
+                str(alert["created_at"]),
+                str(alert["limit_id"]),
+                f'{alert["threshold_pct"]}%',
+                fmt_bytes(alert["consumed_bytes"]),
+                str(alert["message"]),
+            ]
+            for c, value in enumerate(vals):
+                self.alerts_table.setItem(r, c, QTableWidgetItem(value))
 
         apps = state["applications"]
         self.apps_table.setRowCount(len(apps))
