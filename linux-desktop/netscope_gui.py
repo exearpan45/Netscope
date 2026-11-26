@@ -337,9 +337,13 @@ class NetscopeWindow(QMainWindow):
 
         ov = state["overview"]
         self.overview_lbl.setText(
-            f"Today: {fmt_bytes(ov['today']['total_bytes'])} (DL {fmt_bytes(ov['today']['total_rx_bytes'])} / UL {fmt_bytes(ov['today']['total_tx_bytes'])})\n"
-            f"Last 7 Days: {fmt_bytes(ov['last_7_days']['total_bytes'])}  |  This Month: {fmt_bytes(ov['this_month']['total_bytes'])}  |  Lifetime: {fmt_bytes(ov['lifetime']['total_bytes'])}"
+            f"Last 7 days  {fmt_bytes(ov['last_7_days']['total_bytes'])}     •     "
+            f"This month  {fmt_bytes(ov['this_month']['total_bytes'])}"
         )
+        self.today_value.setText(fmt_bytes(ov["today"]["total_bytes"]))
+        self.download_value.setText(fmt_bytes(ov["today"]["total_rx_bytes"]))
+        self.upload_value.setText(fmt_bytes(ov["today"]["total_tx_bytes"]))
+        self.lifetime_value.setText(fmt_bytes(ov["lifetime"]["total_bytes"]))
 
         ifaces = state["interfaces"]
         self.ifaces_table.setRowCount(len(ifaces))
