@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Builds a genuine Debian (.deb) package for Ubuntu / Zorin OS / Linux Mint / Debian
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="1.0.2"
+VERSION="1.0.3"
 PKG_NAME="netscope_${VERSION}_amd64"
 BUILD_DIR="${ROOT_DIR}/dist-deb/${PKG_NAME}"
 
@@ -41,7 +41,7 @@ Version: ${VERSION}
 Section: net
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pyside6.qtwidgets | python3-pyside6, iproute2, libnotify-bin
+Depends: python3 (>= 3.10), python3-pyqt6, iproute2, libnotify-bin
 Recommends: nftables
 Maintainer: NETSCOPE Engineering <support@netscope.local>
 Description: Complete Network Intelligence for Linux
