@@ -377,7 +377,13 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
         alerts = [
             dict(r)
             for r in conn.execute(
-                "SELECT * FROM alert_events ORDER BY id DESC LIMIT 40"
+                """
+                SELECT a.*, COALESCE(l.notify_desktop, 1) AS notify_desktop
+                FROM alert_events AS a
+                LEFT JOIN data_limits AS l ON l.id = a.limit_id
+                ORDER BY a.id DESC
+                LIMIT 40
+                """
             ).fetchall()
         ]
 
