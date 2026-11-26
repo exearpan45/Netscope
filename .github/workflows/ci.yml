@@ -1,0 +1,35 @@
+name: NETSCOPE CI
+
+on:
+  push:
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python sources
+        run: python -m compileall -q netscope linux-desktop/netscope_gui.py tests
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate packaging script
+        run: bash -n linux-desktop/build-deb.sh
+      - name: Build Debian package
+        run: bash linux-desktop/build-deb.sh
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: netscope-debian-amd64
+          path: dist-deb/netscope_1.0.1_amd64.deb
+          if-no-files-found: error
