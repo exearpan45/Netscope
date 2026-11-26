@@ -56,6 +56,35 @@ def resolve_date_range(
     return "1970-01-01", today.isoformat(), "Lifetime (Since Monitoring Started)"
 
 
+def resolve_custom_limit_range(
+    limit: dict[str, Any], today: dt.date | None = None
+) -> tuple[str, str, str]:
+    """Resolve a custom allowance into fixed, repeatable N-day cycles.
+
+    Cycles are anchored to the limit's creation date. This prevents the same
+    rolling-window threshold from generating a fresh warning every day.
+    """
+    current = today or now_local().date()
+    days = max(1, int(limit.get("custom_days", 30) or 30))
+    created_at = str(limit.get("created_at") or "")
+    try:
+        created = dt.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        if created.tzinfo is not None:
+            anchor = created.astimezone(now_local().tzinfo).date()
+        else:
+            anchor = created.date()
+    except (TypeError, ValueError):
+        anchor = current - dt.timedelta(days=days - 1)
+
+    if anchor > current:
+        anchor = current
+    cycle = max(0, (current - anchor).days // days)
+    start = anchor + dt.timedelta(days=cycle * days)
+    end = min(start + dt.timedelta(days=days - 1), current)
+    period_key = f"custom-{int(limit.get('id', 0))}-{start.isoformat()}"
+    return start.isoformat(), end.isoformat(), period_key
+
+
 def query_period_analytics(
     db: NetscopeDB,
     period: str = "last_30_days",
@@ -377,8 +406,8 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
         elif p == "monthly":
             consumed = month_summary["summary"]["total_bytes"]
         else:
-            start_c = (now_local().date() - dt.timedelta(days=max(1, lim["custom_days"]) - 1)).isoformat()
-            custom_res = query_period_analytics(db, "custom", start_c, today_str, exclude_loopback=exclude_loopback)
+            start_c, end_c, _ = resolve_custom_limit_range(lim, now_local().date())
+            custom_res = query_period_analytics(db, "custom", start_c, end_c, exclude_loopback=exclude_loopback)
             consumed = custom_res["summary"]["total_bytes"]
         pct = round((consumed / lim["limit_bytes"]) * 100.0, 2) if lim["limit_bytes"] > 0 else 0.0
         limits_enriched.append(
