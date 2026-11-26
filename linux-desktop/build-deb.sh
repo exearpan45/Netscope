@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Builds a genuine Debian (.deb) package for Ubuntu / Zorin OS / Linux Mint / Debian
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="1.0.3"
+VERSION="1.0.4"
 PKG_NAME="netscope_${VERSION}_amd64"
 BUILD_DIR="${ROOT_DIR}/dist-deb/${PKG_NAME}"
 
