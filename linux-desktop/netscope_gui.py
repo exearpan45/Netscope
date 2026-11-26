@@ -214,7 +214,7 @@ class NetscopeWindow(QMainWindow):
     def _make_table(self, headers: list[str]) -> QTableWidget:
         tbl = QTableWidget(0, len(headers))
         tbl.setHorizontalHeaderLabels(headers)
-        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         tbl.setStyleSheet("QTableWidget { background: #111827; gridline-color: #1e293b; border: 1px solid #1e293b; }")
         return tbl
 
