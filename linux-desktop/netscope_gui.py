@@ -93,31 +93,23 @@ class NetscopeWindow(QMainWindow):
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
         sidebar.setFixedWidth(248)
-        sidebar.setStyleSheet("background: #0f172a; color: #e2e8f0; border-right: 1px solid #1e293b;")
         sb_layout = QVBoxLayout(sidebar)
         sb_layout.setContentsMargins(12, 16, 12, 16)
 
         brand = QLabel("◈  NETSCOPE")
         brand.setObjectName("brand")
-        brand.setStyleSheet("font-size: 18px; font-weight: 700; color: #ffffff; padding: 4px 8px;")
         sb_layout.addWidget(brand)
 
         self.nav_list = QListWidget()
         self.nav_list.setObjectName("navigation")
         self.nav_list.addItems(SIDEBAR_PAGES)
         self.nav_list.setCurrentRow(0)
-        self.nav_list.setStyleSheet(
-            "QListWidget { border: none; background: transparent; outline: none; }"
-            "QListWidget::item { padding: 9px 10px; border-radius: 6px; margin-bottom: 2px; }"
-            "QListWidget::item:selected { background: #0284c7; color: #ffffff; font-weight: 600; }"
-        )
         sb_layout.addWidget(self.nav_list)
         main_layout.addWidget(sidebar)
 
         # Content column
         right_col = QWidget()
         right_col.setObjectName("content")
-        right_col.setStyleSheet("background: #0b1120; color: #f1f5f9;")
         right_layout = QVBoxLayout(right_col)
         right_layout.setContentsMargins(20, 16, 20, 16)
 
@@ -135,9 +127,6 @@ class NetscopeWindow(QMainWindow):
         export_btn = QPushButton("⇩  Export report")
         export_btn.setObjectName("primaryButton")
         export_btn.clicked.connect(self.export_report)
-
-        for lbl in (self.status_lbl, self.dl_lbl, self.ul_lbl):
-            lbl.setStyleSheet("font-family: monospace; font-size: 13px; color: #cbd5e1;")
 
         top_bar.addWidget(self.status_lbl)
         top_bar.addStretch()
