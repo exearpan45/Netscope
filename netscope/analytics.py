@@ -71,8 +71,15 @@ def query_period_analytics(
     if exclude_loopback:
         where_clauses.append("is_loopback = 0")
     if iface_filter and iface_filter != "all":
+        # An explicit interface filter is an intentional request to inspect
+        # that interface, including VPN/virtual interfaces.
         where_clauses.append("iface = ?")
         params.append(iface_filter)
+    else:
+        # Tunnel + underlay and bridge + physical counters can count the same
+        # packets twice. Keep these interfaces visible individually, but
+        # exclude them from aggregate usage totals.
+        where_clauses.extend(["is_vpn = 0", "iface_type != 'virtual'"])
 
     where_sql = " AND ".join(where_clauses)
 
@@ -152,6 +159,8 @@ def query_period_analytics(
             if iface_filter and iface_filter != "all":
                 p_where.append("iface = ?")
                 p_params.append(iface_filter)
+            else:
+                p_where.extend(["is_vpn = 0", "iface_type != 'virtual'"])
             prev_row = conn.execute(
                 f"SELECT SUM(rx_bytes + tx_bytes) AS tot FROM daily_interface_usage WHERE {' AND '.join(p_where)}",
                 p_params,
@@ -224,6 +233,8 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
         ts_buckets: dict[str, dict[str, Any]] = {}
         for s in reversed(samples):
             if exclude_loopback and s["is_loopback"]:
+                continue
+            if s["is_vpn"] or s["iface_type"] == "virtual":
                 continue
             ts = s["ts_utc"]
             if ts not in ts_buckets:
@@ -378,16 +389,15 @@ def query_dashboard_state(db: NetscopeDB, live_state: dict[str, Any] | None = No
             }
         )
 
-    cur_rx_bps = sum(
-        i["rx_rate_bps"]
-        for i in interfaces_out
+    # Apply the same non-duplicating policy to global live rates.
+    # Individual VPN/virtual interface rates remain visible in interfaces_out.
+    aggregate_interfaces = [
+        i for i in interfaces_out
         if not (exclude_loopback and i["iface_type"] == "loopback")
-    )
-    cur_tx_bps = sum(
-        i["tx_rate_bps"]
-        for i in interfaces_out
-        if not (exclude_loopback and i["iface_type"] == "loopback")
-    )
+        and i["iface_type"] not in ("vpn", "virtual")
+    ]
+    cur_rx_bps = sum(i["rx_rate_bps"] for i in aggregate_interfaces)
+    cur_tx_bps = sum(i["tx_rate_bps"] for i in aggregate_interfaces)
 
     active_non_lo = [
         i for i in interfaces_out if i["iface_type"] != "loopback" and i["status"] == "up"
