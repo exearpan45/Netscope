@@ -33,11 +33,29 @@ def _handle_signal(_signum: int, _frame: Any) -> None:
     _RUNNING = False
 
 
+def _desktop_gui_running() -> bool:
+    """Avoid duplicate popups when the Qt tray application owns notifications."""
+    try:
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit() or entry == str(os.getpid()):
+                continue
+            try:
+                with open(f"/proc/{entry}/cmdline", "rb") as fh:
+                    cmdline = fh.read()
+                if b"netscope_gui.py" in cmdline:
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
 def _send_desktop_notification(title: str, body: str) -> bool:
     """Send a session notification and report failures instead of hiding them."""
     notify_bin = shutil.which("notify-send")
     if not notify_bin:
-        sys.stderr.write("[netscope.daemon] notify-send is unavailable; desktop alert was not delivered.\\n")
+        sys.stderr.write("[netscope.daemon] notify-send is unavailable; desktop alert was not delivered.\n")
         return False
     try:
         result = subprocess.run(
@@ -51,11 +69,11 @@ def _send_desktop_notification(title: str, body: str) -> bool:
         )
         if result.returncode != 0:
             detail = (result.stderr or "").strip() or f"exit status {result.returncode}"
-            sys.stderr.write(f"[netscope.daemon] desktop notification failed: {detail}\\n")
+            sys.stderr.write(f"[netscope.daemon] desktop notification failed: {detail}\n")
             return False
         return True
     except (OSError, subprocess.SubprocessError) as exc:
-        sys.stderr.write(f"[netscope.daemon] desktop notification error: {exc}\\n")
+        sys.stderr.write(f"[netscope.daemon] desktop notification error: {exc}\n")
         return False
 
 
@@ -139,7 +157,8 @@ class MonitorEngine:
                         )
                         conn.commit()
                         if cur.rowcount > 0 and desktop_ok and lim["notify_desktop"]:
-                            _send_desktop_notification("NETSCOPE Data Allowance Alert", msg)
+                            if not _desktop_gui_running():
+                                _send_desktop_notification("NETSCOPE Data Allowance Alert", msg)
 
     def step(self) -> dict[str, Any]:
         settings = self.db.get_settings()
